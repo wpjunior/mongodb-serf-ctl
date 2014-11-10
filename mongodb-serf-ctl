@@ -1,0 +1,109 @@
+#!/usr/bin/make -f
+
+ifndef name
+name = mongodb
+endif
+
+ifndef router
+router = router01
+endif
+
+pull:
+	@docker pull wpjunior/mongodb-serf
+
+start:
+	@$(_) start_ad
+	@$(_) start_configserver1
+	@$(_) start_configserver2
+	@$(_) start_configserver3
+	@$(_) start_router01
+	@sleep 3
+
+	@$(_) start_rs1
+	@sleep 10
+	@$(_) start_rs2
+
+start_ad:
+	@docker run -d --name="ad.$(name)" -h "ad.$(name)" -p 7946 -p 7373 \
+		--entrypoint="/usr/bin/initialize-ad.sh" wpjunior/mongodb-serf
+	@echo "ad.$(name) started"
+
+
+stop_ad:
+	- docker kill "ad.$(name)"
+	- docker rm "ad.$(name)"
+	@echo "ad.$(name) stoped"
+
+
+start_configserver%:
+	@docker run -h "configserver0$*.$(name)" --name="configserver0$*.$(name)" \
+		--link ad.$(name):ad \
+		-e OPTIONS="d --configsvr --notablescan --noprealloc --smallfiles --dbpath /data/db --port 27017" \
+		-d wpjunior/mongodb-serf
+	@echo "configserver0$*.$(name) started"
+
+start_router%:
+	@docker run -h "router$*.$(name)" --name "router$*.$(name)" \
+		--link ad.$(name):ad -d \
+		-e OPTIONS="s --configdb configserver01:27017,configserver02:27017,configserver03:27017 --port 27017" \
+		wpjunior/mongodb-serf
+	@echo "router$*.$(name) started"
+
+stop_router%:
+	- docker kill "router$*.$(name)"
+	- docker rm "router$*.$(name)"
+	@echo "router$*.$(name) stoped"
+
+
+start_rs%:
+	@$(_) start_db01 rs=$*
+	@sleep 10
+	@$(_) start_db02 rs=$*
+	@sleep 10
+
+start_db%:
+	@docker run -h "rs$(rs)db$*.$(name)" --name="rs$(rs)db$*.$(name)" \
+		--link ad.$(name):ad \
+		-e OPTIONS="d --replSet rs$(rs) --noprealloc --smallfiles" \
+		-d wpjunior/mongodb-serf
+	@echo "rs$(rs)db$*.$(name) started"
+
+
+stop:
+	@$(_) _stop_all
+
+shell:
+	@docker run -h "router$*.$(name)" --name "router$*.$(name)" \
+		-i -t --link "ad.$(name):ad" --rm=true --entrypoint="/usr/bin/initialize-shell.sh" \
+		wpjunior/mongodb-serf $(router):27017/test
+
+stop_configserver%:
+	- docker kill "configserver0$*.$(name)"
+	- docker rm "configserver0$*.$(name)"
+	@echo "configserver0$*.$(name) stoped"
+
+
+stop_rs%:
+	@$(_) stop_db_node_01 rs=$*
+	@$(_) stop_db_node_02 rs=$*
+
+stop_db_node_%:
+	@docker kill "rs$(rs)db$*.$(name)"
+	@docker rm "rs$(rs)db$*.$(name)"
+
+status:
+	@docker run -i -t --link ad.$(name):serf_1 --name="members.$(name)" -h "members.$(name)" --rm=true ctlc/serf-members
+
+_stop_all:
+	@docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker kill
+	@docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker rm
+	@echo 'cluster: $(name) stoped'
+
+help:
+	@echo '   start [name=mongodb] ............................. start mongodb cluster '
+	@echo '   stop [name=mongodb] .............................. stop mongodb cluster '
+	@echo '   start_router% [name=mongodb] ..................... start a instance of mongos shard router, example: start_router02 '
+	@echo '   stop_router% [name=mongodb] ...................... stop a instance of mongos shard router, example: stop_router02 '
+	@echo '   shell [name=mongodb] [router=router01] ........... start a mongodb shell'
+	@echo '   start_rs% [name=mongodb] ......................... start a new replicaset, example: start_rs3'
+	@echo '   stop_rs% [name=mongodb] .......................... stop a replicaset, example: stop_rs3'
