@@ -8,9 +8,13 @@ ifndef router
 router = router01
 endif
 
+all: help
+
 pull:
 	@docker pull wpjunior/mongodb-serf
 
+build:
+	@docker build -t wpjunior/mongodb-serf https://github.com/wpjunior/mongodb-serf.git
 start:
 	@$(_) start_ad
 	@$(_) start_configserver1
@@ -100,6 +104,11 @@ _stop_all:
 	@echo 'cluster: $(name) stoped'
 
 help:
+	@echo 'mongodb-serf-ctl, a controller for mongodb cluster with serf'
+	@echo 'usage: mongodb-serf-ctl command [parameters]'
+	@echo 'available comands:'
+	@echo '   build ............................................ build docker image'
+	@echo '   pull ............................................. pull builded image from server'
 	@echo '   start [name=mongodb] ............................. start mongodb cluster '
 	@echo '   stop [name=mongodb] .............................. stop mongodb cluster '
 	@echo '   start_router% [name=mongodb] ..................... start a instance of mongos shard router, example: start_router02 '
