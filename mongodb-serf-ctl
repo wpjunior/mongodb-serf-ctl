@@ -49,7 +49,7 @@ start_configserver%:
 start_router%:
 	@docker run -h "router$*.$(name)" --name "router$*.$(name)" \
 		--link ad.$(name):ad -d \
-		-e OPTIONS="s --configdb configserver01:27017,configserver02:27017,configserver03:27017 --port 27017" \
+		-e OPTIONS="s --configdb configserver01.$(name):27017,configserver02.$(name):27017,configserver03.$(name):27017 --port 27017" \
 		wpjunior/mongodb-serf
 	@echo "router$*.$(name) started"
 
