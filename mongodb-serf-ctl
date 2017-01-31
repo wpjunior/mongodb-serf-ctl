@@ -17,11 +17,12 @@ build:
 	@docker build -t wpjunior/mongodb-serf https://github.com/wpjunior/mongodb-serf.git
 start:
 	@$(_) start_ad
-	@$(_) start_configserver1
-	@$(_) start_configserver2
 	@$(_) start_configserver3
+	@$(_) start_configserver2
+	@$(_) start_configserver1
+	@sleep 10
 	@$(_) start_router01
-	@sleep 3
+	@sleep 10
 
 	@$(_) start_rs1
 	@sleep 10
@@ -29,6 +30,7 @@ start:
 
 start_ad:
 	@docker run -d --name="ad.$(name)" -h "ad.$(name)" -p 7946 -p 7373 \
+		-e MONGODB_SUFFIX="${name}" \
 		--entrypoint="/usr/bin/initialize-ad.sh" wpjunior/mongodb-serf
 	@echo "ad.$(name) started"
 
@@ -42,14 +44,14 @@ stop_ad:
 start_configserver%:
 	@docker run -h "configserver0$*.$(name)" --name="configserver0$*.$(name)" \
 		--link ad.$(name):ad \
-		-e OPTIONS="d --configsvr --notablescan --noprealloc --smallfiles --dbpath /data/db --port 27017" \
+		-e OPTIONS="d --configsvr --replSet cfg --dbpath /data/db" \
 		-d wpjunior/mongodb-serf
 	@echo "configserver0$*.$(name) started"
 
 start_router%:
 	@docker run -h "router$*.$(name)" --name "router$*.$(name)" \
 		--link ad.$(name):ad -d \
-		-e OPTIONS="s --configdb configserver01.$(name):27017,configserver02.$(name):27017,configserver03.$(name):27017 --port 27017" \
+		-e OPTIONS="s --configdb cfg/configserver01.$(name):27019,configserver02.$(name):27019,configserver03.$(name):27019 --port 27017" \
 		wpjunior/mongodb-serf
 	@echo "router$*.$(name) started"
 
@@ -68,7 +70,7 @@ start_rs%:
 start_db%:
 	@docker run -h "rs$(rs)db$*.$(name)" --name="rs$(rs)db$*.$(name)" \
 		--link ad.$(name):ad \
-		-e OPTIONS="d --replSet rs$(rs) --noprealloc --smallfiles" \
+		-e OPTIONS="d --replSet rs$(rs) --noprealloc --smallfiles --port 27017" \
 		-d wpjunior/mongodb-serf
 	@echo "rs$(rs)db$*.$(name) started"
 
@@ -99,8 +101,8 @@ status:
 	@docker run -i -t --link ad.$(name):serf_1 --name="members.$(name)" -h "members.$(name)" --rm=true ctlc/serf-members
 
 _stop_all:
-	@docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker kill
-	@docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker rm
+	-docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker kill
+	-docker ps -a | grep ".$(name)" | awk '{split($$1,a,"-");print a[1]}' | xargs docker rm
 	@echo 'cluster: $(name) stoped'
 
 help:
