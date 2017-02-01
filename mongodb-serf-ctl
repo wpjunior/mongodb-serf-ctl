@@ -79,9 +79,7 @@ stop:
 	@$(_) _stop_all
 
 shell:
-	@docker run -h "router$*.$(name)" --name "router$*.$(name)" \
-		-i -t --link "ad.$(name):ad" --rm=true --entrypoint="/usr/bin/initialize-shell.sh" \
-		wpjunior/mongodb-serf $(router):27017/test
+	@docker exec -it "router01.$(name)" mongo
 
 stop_configserver%:
 	- docker kill "configserver0$*.$(name)"
