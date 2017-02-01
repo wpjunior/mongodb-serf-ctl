@@ -70,7 +70,7 @@ start_rs%:
 start_db%:
 	@docker run -h "rs$(rs)db$*.$(name)" --name="rs$(rs)db$*.$(name)" \
 		--link ad.$(name):ad \
-		-e OPTIONS="d --replSet rs$(rs) --noprealloc --smallfiles --port 27017" \
+		-e OPTIONS="d --replSet rs$(rs) --shardsvr --port 27017" \
 		-d wpjunior/mongodb-serf
 	@echo "rs$(rs)db$*.$(name) started"
 
